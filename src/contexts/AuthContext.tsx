@@ -23,20 +23,14 @@ interface User extends FirebaseUser {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string, role: 'teacher' | 'student') => Promise<void>;
+  login: (email: string, password: string, userType: 'teacher' | 'student') => Promise<void>;
+  register: (email: string, password: string, name: string, userType: 'teacher' | 'student') => Promise<void>;
   logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -48,10 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (firebaseUser) {
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         const userData = userDoc.data();
-        setUser({
-          ...firebaseUser,
-          role: userData?.role
-        });
+        setUser({ ...firebaseUser, role: userData?.role });
       } else {
         setUser(null);
       }
@@ -61,49 +52,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      const userData = userDoc.data();
-      const role = userData?.role || 'student';
-      navigate(role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard');
-    } catch (error) {
-      console.error('Error logging in:', error);
-      throw error;
-    }
+  const register = async (email: string, password: string, name: string, userType: 'teacher' | 'student') => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    
+    await setDoc(doc(db, 'users', user.uid), {
+      email,
+      name,
+      role: userType,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   };
 
-  const register = async (email: string, password: string, name: string, role: 'teacher' | 'student') => {
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const userDoc = {
-        email,
-        name,
-        role,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-      await setDoc(doc(db, 'users', userCredential.user.uid), userDoc);
-    } catch (error) {
-      console.error('Error registering:', error);
-      throw error;
+  const login = async (email: string, password: string, userType: 'teacher' | 'student') => {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+    const userData = userDoc.data();
+    
+    if (userData?.role !== userType) {
+      throw new Error('Tipo de usuario incorrecto');
     }
   };
 
   const logout = async () => {
-    try {
-      await signOut(auth);
-      navigate('/login');
-    } catch (error) {
-      console.error('Error logging out:', error);
-      throw error;
-    }
+    await signOut(auth);
+  };
+
+  const value = {
+    user,
+    loading,
+    login,
+    register,
+    logout
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
-      {children}
+    <AuthContext.Provider value={value}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 }; 
