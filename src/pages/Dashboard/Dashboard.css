@@ -1,0 +1,23 @@
+.dashboard-calendar {
+  width: 100%;
+  border: none;
+  box-shadow: none;
+}
+
+.dashboard-calendar .react-calendar__tile {
+  padding: 1em;
+}
+
+.dashboard-calendar .react-calendar__tile--now {
+  background: #e3f2fd;
+}
+
+.dashboard-calendar .react-calendar__tile--active {
+  background: #1976d2;
+  color: white;
+}
+
+.dashboard-calendar .react-calendar__navigation button:enabled:hover,
+.dashboard-calendar .react-calendar__navigation button:enabled:focus {
+  background-color: #e3f2fd;
+} 
